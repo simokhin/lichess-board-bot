@@ -28,7 +28,7 @@ export function createBot(): { bot: Bot; gameManager: GameManager } {
         `Ваш chat id: ${ctx.chat.id} (можно сохранить в TELEGRAM_ALLOWED_CHAT_ID).\n\n` +
         "Начните партию на lichess.org — я подключусь автоматически.\n" +
         "Отправляйте ходы текстом (например: e4, Nf3, O-O).\n" +
-        "Команды: /status, /resign",
+        "Команды: /status, /resign, /draw, /nodraw",
     );
   });
 
@@ -38,6 +38,14 @@ export function createBot(): { bot: Bot; gameManager: GameManager } {
 
   bot.command("resign", async (ctx) => {
     await ctx.reply(await gameManager.resign());
+  });
+
+  bot.command("draw", async (ctx) => {
+    await ctx.reply(await gameManager.offerDraw());
+  });
+
+  bot.command("nodraw", async (ctx) => {
+    await ctx.reply(await gameManager.declineDraw());
   });
 
   bot.on("message:text", async (ctx) => {

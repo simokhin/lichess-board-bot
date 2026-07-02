@@ -1,5 +1,13 @@
 import { Chess, type Move } from "chess.js";
-import { getAccount, makeMove, resignGame, streamEvents, streamGame } from "./lichessClient.js";
+import {
+  declineDraw,
+  getAccount,
+  makeMove,
+  offerOrAcceptDraw,
+  resignGame,
+  streamEvents,
+  streamGame,
+} from "./lichessClient.js";
 
 type Color = "white" | "black";
 
@@ -25,6 +33,7 @@ export class GameManager {
   private myColor: Color | null = null;
   private chess = new Chess();
   private appliedMoveCount = 0;
+  private opponentOfferedDraw = false;
 
   constructor(private readonly notify: (text: string) => void) {}
 
@@ -58,6 +67,7 @@ export class GameManager {
     this.chess = new Chess();
     this.appliedMoveCount = 0;
     this.myColor = null;
+    this.opponentOfferedDraw = false;
 
     let attempt = 0;
     while (this.gameId === gameId) {
@@ -126,6 +136,15 @@ export class GameManager {
       }
     }
     this.appliedMoveCount = uciMoves.length;
+
+    if (this.myColor) {
+      const opponentColor: Color = this.myColor === "white" ? "black" : "white";
+      const opponentDrawFlag: boolean = Boolean(opponentColor === "white" ? state.wdraw : state.bdraw);
+      if (opponentDrawFlag && !this.opponentOfferedDraw) {
+        this.notify("🤝 Соперник предлагает ничью. Напишите /draw, чтобы принять, или /nodraw, чтобы отклонить.");
+      }
+      this.opponentOfferedDraw = opponentDrawFlag;
+    }
 
     if (state.status && state.status !== "started" && state.status !== "created") {
       this.notify(this.formatGameEnd(state));
@@ -205,6 +224,31 @@ export class GameManager {
       return "Вы сдались.";
     } catch (err) {
       return `Не удалось сдаться: ${(err as Error).message}`;
+    }
+  }
+
+  /** Offers a draw, or accepts one already offered by the opponent. */
+  async offerDraw(): Promise<string> {
+    if (!this.gameId) {
+      return "Нет активной партии.";
+    }
+    try {
+      await offerOrAcceptDraw(this.gameId);
+      return this.opponentOfferedDraw ? "Ничья принята." : "Предложение ничьей отправлено.";
+    } catch (err) {
+      return `Не удалось отправить предложение ничьей: ${(err as Error).message}`;
+    }
+  }
+
+  async declineDraw(): Promise<string> {
+    if (!this.gameId) {
+      return "Нет активной партии.";
+    }
+    try {
+      await declineDraw(this.gameId);
+      return "Предложение ничьей отклонено.";
+    } catch (err) {
+      return `Не удалось отклонить ничью: ${(err as Error).message}`;
     }
   }
 

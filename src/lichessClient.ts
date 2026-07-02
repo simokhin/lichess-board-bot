@@ -76,3 +76,13 @@ export async function makeMove(gameId: string, uci: string): Promise<void> {
 export async function resignGame(gameId: string): Promise<void> {
   await lichessFetchOk(`/api/board/game/${gameId}/resign`, { method: "POST" });
 }
+
+/** Offers a draw, or accepts one already offered by the opponent. */
+export async function offerOrAcceptDraw(gameId: string): Promise<void> {
+  await lichessFetchOk(`/api/board/game/${gameId}/draw/yes`, { method: "POST" });
+}
+
+/** Declines a draw offered by the opponent. */
+export async function declineDraw(gameId: string): Promise<void> {
+  await lichessFetchOk(`/api/board/game/${gameId}/draw/no`, { method: "POST" });
+}
