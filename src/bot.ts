@@ -127,10 +127,16 @@ export function createBot(): { bot: Bot; gameManager: GameManager } {
   bot.use(resignMenu);
 
   bot.command("start", async (ctx) => {
+    const restrictionNotice =
+      config.allowedChatId === undefined
+        ? "\n\n⚠️ Anyone who finds this bot can currently use it — set TELEGRAM_ALLOWED_CHAT_ID " +
+          `to ${ctx.chat.id} in .env and restart to restrict it to this chat.`
+        : "";
     await ctx.reply(
       "Hi! I'm a bridge between a physical chess board and lichess.\n" +
         `Your chat id: ${ctx.chat.id} (you can save it as TELEGRAM_ALLOWED_CHAT_ID).\n\n` +
-        "Send /help to see how to play, or /newgame to start.",
+        "Send /help to see how to play, or /newgame to start." +
+        restrictionNotice,
     );
   });
 

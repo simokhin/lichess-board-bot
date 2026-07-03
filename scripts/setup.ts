@@ -100,9 +100,11 @@ async function main() {
     console.log("   Click \"Create\" and copy the token.\n");
     const lichessToken = await promptRequired(rl, "Lichess token", existing.LICHESS_TOKEN, validateLichessToken);
 
-    console.log("3) Restrict the bot to your own chat (optional, recommended)");
-    console.log("   You can leave this blank for now — after setup, send /start to your bot in");
-    console.log("   Telegram and it will reply with your chat id. Re-run \"npm run setup\" to add it later.\n");
+    console.log("3) Restrict the bot to your own chat (optional, but recommended)");
+    console.log("   Until you set this, anyone who finds your bot's username on Telegram can send it");
+    console.log("   moves, resign your games, or start new ones — it doesn't check who's asking.");
+    console.log("   You can leave this blank for now and add it later: send /start to your bot in");
+    console.log("   Telegram, it will reply with your chat id, then re-run \"npm run setup\".\n");
     const allowedChatId = await promptChatId(rl, existing.TELEGRAM_ALLOWED_CHAT_ID);
 
     const envContent =
@@ -118,6 +120,12 @@ async function main() {
     console.log("Setup complete! Start the bot with:\n");
     console.log("  npm run dev\n");
     console.log("Then send /start to your bot in Telegram to begin.");
+    if (!allowedChatId) {
+      console.log(
+        "\n⚠️  No chat id set — the bot will respond to anyone who messages it. " +
+          "Send /start, then add the chat id it gives you to .env (or re-run \"npm run setup\") when you can.",
+      );
+    }
   } finally {
     rl.close();
   }
