@@ -24,11 +24,11 @@ export function createBot(): { bot: Bot; gameManager: GameManager } {
   bot.command("start", async (ctx) => {
     activeChatId = ctx.chat.id;
     await ctx.reply(
-      "Привет! Я мост между физической доской и lichess.\n" +
-        `Ваш chat id: ${ctx.chat.id} (можно сохранить в TELEGRAM_ALLOWED_CHAT_ID).\n\n` +
-        "Начните партию на lichess.org — я подключусь автоматически.\n" +
-        "Отправляйте ходы текстом (например: e4, Nf3, O-O).\n" +
-        "Команды: /status, /resign, /draw, /nodraw",
+      "Hi! I'm a bridge between a physical chess board and lichess.\n" +
+        `Your chat id: ${ctx.chat.id} (you can save it as TELEGRAM_ALLOWED_CHAT_ID).\n\n` +
+        "Start a game on lichess.org — I'll connect automatically.\n" +
+        "Send moves as plain text (e.g. e4, Nf3, O-O).\n" +
+        "Commands: /status, /resign, /draw, /nodraw",
     );
   });
 

@@ -74,7 +74,7 @@ export class GameManager {
   async start(): Promise<void> {
     const account = await getAccount();
     this.accountId = account.id;
-    this.notify(`Подключен к lichess как ${account.username}. Жду начала партии...`);
+    this.notify(`Connected to lichess as ${account.username}. Waiting for a game to start...`);
     void this.listenEvents();
   }
 
@@ -84,7 +84,7 @@ export class GameManager {
         for await (const event of streamEvents()) {
           if (event.type === "gameStart" && event.game?.id) {
             this.attachGame(event.game.id).catch((err) =>
-              this.notify(`Ошибка подключения к игре: ${(err as Error).message}`),
+              this.notify(`Failed to connect to game: ${(err as Error).message}`),
             );
           }
         }
@@ -128,12 +128,12 @@ export class GameManager {
 
       if (attempt > MAX_GAME_RECONNECT_ATTEMPTS) {
         this.notify(
-          `Не удалось восстановить соединение с партией после ${MAX_GAME_RECONNECT_ATTEMPTS} попыток: https://lichess.org/${gameId}`,
+          `Could not restore the connection to the game after ${MAX_GAME_RECONNECT_ATTEMPTS} attempts: https://lichess.org/${gameId}`,
         );
         this.gameId = null;
         return;
       }
-      this.notify(`Связь с партией прервана, переподключаюсь... (попытка ${attempt}/${MAX_GAME_RECONNECT_ATTEMPTS})`);
+      this.notify(`Lost connection to the game, reconnecting... (attempt ${attempt}/${MAX_GAME_RECONNECT_ATTEMPTS})`);
       await sleep(RECONNECT_DELAY_MS);
     }
   }
@@ -142,11 +142,11 @@ export class GameManager {
     const { white, black } = msg;
     this.myColor = white.id === this.accountId ? "white" : "black";
     const opponent = this.myColor === "white" ? black : white;
-    const opponentName = opponent.name ?? (opponent.aiLevel ? `Stockfish (уровень ${opponent.aiLevel})` : "соперник");
+    const opponentName = opponent.name ?? (opponent.aiLevel ? `Stockfish (level ${opponent.aiLevel})` : "opponent");
 
     this.notify(
-      `Партия началась: https://lichess.org/${msg.id}\n` +
-        `Вы играете за ${this.myColor === "white" ? "белых" : "чёрных"} против ${opponentName}.`,
+      `Game started: https://lichess.org/${msg.id}\n` +
+        `You're playing ${this.myColor === "white" ? "white" : "black"} against ${opponentName}.`,
     );
 
     this.handleGameState(msg.state);
@@ -167,14 +167,14 @@ export class GameManager {
     if (typeof state.btime === "number") this.blackTimeMs = state.btime;
     const clockSuffix =
       this.whiteTimeMs !== null && this.blackTimeMs !== null
-        ? ` (белые: ${formatClock(this.whiteTimeMs)}, чёрные: ${formatClock(this.blackTimeMs)})`
+        ? ` (white: ${formatClock(this.whiteTimeMs)}, black: ${formatClock(this.blackTimeMs)})`
         : "";
 
     if (uciMoves.length > this.appliedMoveCount && this.myColor) {
       for (let i = this.appliedMoveCount; i < uciMoves.length; i++) {
         const moverColor: Color = i % 2 === 0 ? "white" : "black";
         if (moverColor !== this.myColor) {
-          this.notify(`Соперник сыграл: ${sans[i]}${clockSuffix}`);
+          this.notify(`Opponent played: ${sans[i]}${clockSuffix}`);
         }
       }
     }
@@ -184,7 +184,7 @@ export class GameManager {
       const opponentColor: Color = this.myColor === "white" ? "black" : "white";
       const opponentDrawFlag: boolean = Boolean(opponentColor === "white" ? state.wdraw : state.bdraw);
       if (opponentDrawFlag && !this.opponentOfferedDraw) {
-        this.notify("🤝 Соперник предлагает ничью. Напишите /draw, чтобы принять, или /nodraw, чтобы отклонить.");
+        this.notify("🤝 Opponent offers a draw. Send /draw to accept, or /nodraw to decline.");
       }
       this.opponentOfferedDraw = opponentDrawFlag;
     }
@@ -197,35 +197,35 @@ export class GameManager {
 
   private formatGameEnd(state: any): string {
     const statusNames: Record<string, string> = {
-      mate: "мат",
-      resign: "сдача",
-      stalemate: "пат",
-      timeout: "тайм-аут соперника",
-      draw: "ничья",
-      outoftime: "закончилось время",
-      cheat: "аннулирована",
-      noStart: "не началась",
-      aborted: "прервана",
-      variantEnd: "завершение варианта",
+      mate: "checkmate",
+      resign: "resignation",
+      stalemate: "stalemate",
+      timeout: "opponent timed out",
+      draw: "draw",
+      outoftime: "time ran out",
+      cheat: "voided",
+      noStart: "didn't start",
+      aborted: "aborted",
+      variantEnd: "variant ended",
     };
     const statusText = statusNames[state.status] ?? state.status;
 
     if (!state.winner) {
-      return `Игра окончена: ${statusText}.`;
+      return `Game over: ${statusText}.`;
     }
     const iWon = state.winner === this.myColor;
-    return `Игра окончена: ${statusText}. ${iWon ? "Вы победили! 🎉" : "Вы проиграли."}`;
+    return `Game over: ${statusText}. ${iWon ? "You won! 🎉" : "You lost."}`;
   }
 
   /** Parses and submits a user-entered move (SAN or UCI). Returns a reply string for the chat. */
   async handleUserMove(input: string): Promise<string> {
     if (!this.gameId || !this.myColor) {
-      return "Нет активной партии. Начните игру на lichess — я подключусь автоматически.";
+      return "No active game. Start one on lichess — I'll connect automatically.";
     }
 
     const turnColor: Color = this.chess.turn() === "w" ? "white" : "black";
     if (turnColor !== this.myColor) {
-      return "Сейчас не ваш ход.";
+      return "It's not your turn.";
     }
 
     const trimmed = input.trim();
@@ -246,7 +246,7 @@ export class GameManager {
     }
 
     if (!move) {
-      return `Не удалось распознать ход "${input}". Используйте SAN (e4, Nf3, O-O) или UCI (e2e4).`;
+      return `Couldn't parse move "${input}". Use SAN (e4, Nf3, O-O) or UCI (e2e4).`;
     }
 
     const uci = move.from + move.to + (move.promotion ?? "");
@@ -254,65 +254,65 @@ export class GameManager {
       await makeMove(this.gameId, uci);
       const clockSuffix =
         this.whiteTimeMs !== null && this.blackTimeMs !== null
-          ? ` (белые: ${formatClock(this.whiteTimeMs)}, чёрные: ${formatClock(this.blackTimeMs)})`
+          ? ` (white: ${formatClock(this.whiteTimeMs)}, black: ${formatClock(this.blackTimeMs)})`
           : "";
-      return `✅ Ход отправлен: ${move.san}${clockSuffix}`;
+      return `✅ Move sent: ${move.san}${clockSuffix}`;
     } catch (err) {
-      return `Lichess отклонил ход: ${(err as Error).message}`;
+      return `Lichess rejected the move: ${(err as Error).message}`;
     }
   }
 
   async resign(): Promise<string> {
     if (!this.gameId) {
-      return "Нет активной партии.";
+      return "No active game.";
     }
     try {
       await resignGame(this.gameId);
-      return "Вы сдались.";
+      return "You resigned.";
     } catch (err) {
-      return `Не удалось сдаться: ${(err as Error).message}`;
+      return `Failed to resign: ${(err as Error).message}`;
     }
   }
 
   /** Offers a draw, or accepts one already offered by the opponent. */
   async offerDraw(): Promise<string> {
     if (!this.gameId) {
-      return "Нет активной партии.";
+      return "No active game.";
     }
     try {
       await offerOrAcceptDraw(this.gameId);
-      return this.opponentOfferedDraw ? "Ничья принята." : "Предложение ничьей отправлено.";
+      return this.opponentOfferedDraw ? "Draw accepted." : "Draw offer sent.";
     } catch (err) {
-      return `Не удалось отправить предложение ничьей: ${(err as Error).message}`;
+      return `Failed to offer a draw: ${(err as Error).message}`;
     }
   }
 
   async declineDraw(): Promise<string> {
     if (!this.gameId) {
-      return "Нет активной партии.";
+      return "No active game.";
     }
     try {
       await declineDraw(this.gameId);
-      return "Предложение ничьей отклонено.";
+      return "Draw offer declined.";
     } catch (err) {
-      return `Не удалось отклонить ничью: ${(err as Error).message}`;
+      return `Failed to decline the draw: ${(err as Error).message}`;
     }
   }
 
   getStatus(): string {
     if (!this.gameId || !this.myColor) {
-      return "Нет активной партии. Начните игру на lichess.org — я подключусь автоматически.";
+      return "No active game. Start one on lichess.org — I'll connect automatically.";
     }
     const turnColor: Color = this.chess.turn() === "w" ? "white" : "black";
     const isMyTurn = turnColor === this.myColor;
     const clockLine =
       this.whiteTimeMs !== null && this.blackTimeMs !== null
-        ? `Часы: белые ${formatClock(this.whiteTimeMs)} — чёрные ${formatClock(this.blackTimeMs)}\n`
+        ? `Clock: white ${formatClock(this.whiteTimeMs)} — black ${formatClock(this.blackTimeMs)}\n`
         : "";
     return (
-      `Партия: https://lichess.org/${this.gameId}\n` +
-      `Вы играете: ${this.myColor === "white" ? "белыми" : "чёрными"}\n` +
-      `Ход: ${isMyTurn ? "ваш" : "соперника"}\n` +
+      `Game: https://lichess.org/${this.gameId}\n` +
+      `You're playing: ${this.myColor}\n` +
+      `Turn: ${isMyTurn ? "yours" : "opponent's"}\n` +
       clockLine +
       "```\n" +
       renderBoard(this.chess, this.myColor) +
