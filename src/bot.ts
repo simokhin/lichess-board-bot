@@ -24,6 +24,7 @@ export const BOT_COMMANDS = [
   { command: "help", description: "How to play and full command list" },
   { command: "newgame", description: "Start a game (seek or challenge a friend)" },
   { command: "status", description: "Show the board, turn, and clock" },
+  { command: "sync", description: "Reconnect to a game already in progress" },
   { command: "resign", description: "Resign the current game" },
   { command: "draw", description: "Offer or accept a draw" },
   { command: "nodraw", description: "Decline an offered draw" },
@@ -39,6 +40,7 @@ const HELP_TEXT =
   "*Commands*\n" +
   "/newgame — start a game (seek or challenge a friend)\n" +
   "/status — board diagram, whose turn, clock\n" +
+  "/sync — reconnect to a game already in progress (if I missed it)\n" +
   "/resign — resign the current game (asks to confirm)\n" +
   "/draw — offer a draw, or accept one already offered\n" +
   "/nodraw — decline an offered draw";
@@ -146,6 +148,10 @@ export function createBot(): { bot: Bot; gameManager: GameManager } {
 
   bot.command("status", async (ctx) => {
     await ctx.reply(gameManager.getStatus(), { parse_mode: "Markdown" });
+  });
+
+  bot.command("sync", async (ctx) => {
+    await ctx.reply(await gameManager.syncActiveGame(), { parse_mode: "Markdown" });
   });
 
   bot.command("resign", async (ctx) => {

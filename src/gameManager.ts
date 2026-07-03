@@ -4,6 +4,7 @@ import { escapeMd, formatClock } from "./format.js";
 import {
   declineDraw,
   getAccount,
+  getCurrentGameId,
   makeMove,
   offerOrAcceptDraw,
   resignGame,
@@ -36,6 +37,27 @@ export class GameManager {
     this.accountId = account.id;
     this.notify(`👋 Connected to lichess as *${escapeMd(account.username)}*. Waiting for a game to start...`);
     void this.listenEvents();
+    console.log(await this.syncActiveGame());
+  }
+
+  /**
+   * Checks lichess for a game already in progress and attaches to it if we aren't already
+   * tracking one. Runs on startup to catch a game that started (or that we missed the
+   * gameStart event for) while the bot wasn't connected; can also be triggered manually via
+   * /sync to recover without restarting the process.
+   */
+  async syncActiveGame(): Promise<string> {
+    if (this.gameId !== null) {
+      return `Already tracking a game: ${this.getActiveGameLink()}`;
+    }
+    const currentGameId = await getCurrentGameId();
+    if (!currentGameId) {
+      return "No game in progress on lichess right now.";
+    }
+    this.attachGame(currentGameId).catch((err) =>
+      this.notify(`⚠️ Failed to connect to game: ${escapeMd((err as Error).message)}`),
+    );
+    return `🔄 Found a game in progress, connecting: https://lichess.org/${currentGameId}`;
   }
 
   hasActiveGame(): boolean {

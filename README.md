@@ -7,10 +7,12 @@ opponent's moves come back as Telegram messages.
 
 ## Features
 
-- Auto-connects to your active game as soon as it starts on lichess (no need to do anything but play).
+- Auto-connects to your active game as soon as it starts on lichess (no need to do anything but play);
+  also checks for a game already in progress on startup, in case the bot was offline when it began.
 - Send moves in SAN (`e4`, `Nf3`, `O-O`, `0-0`) or UCI (`e2e4`, `e7e8q`).
 - `/newgame` — inline menu to find a real-time opponent (Rapid/Classical) or challenge a friend by username.
 - `/status` — current position as a unicode board diagram, whose turn it is, and the clock.
+- `/sync` — manually reconnect to a game already in progress, if it was ever missed.
 - `/draw` / `/nodraw` — offer, accept, or decline a draw.
 - `/resign` — resign the game.
 - Reconnects automatically if the connection to a game drops mid-play.
@@ -60,6 +62,7 @@ offers, and game-end results arrive as bot messages.
 | --- | --- |
 | `/newgame` | Start a game via quick pairing or by challenging a friend |
 | `/status` | Show the board, whose turn it is, and the clock |
+| `/sync` | Reconnect to a game already in progress, if it was ever missed |
 | `/resign` | Resign the current game |
 | `/draw` | Offer a draw, or accept one already offered |
 | `/nodraw` | Decline an offered draw |

@@ -42,6 +42,13 @@ export async function getAccount(): Promise<LichessAccount> {
   return res.json() as Promise<LichessAccount>;
 }
 
+/** Returns the id of a game already in progress on the account, if any. */
+export async function getCurrentGameId(): Promise<string | null> {
+  const res = await lichessFetchOk("/api/account/playing");
+  const data = (await res.json()) as { nowPlaying: Array<{ gameId: string }> };
+  return data.nowPlaying[0]?.gameId ?? null;
+}
+
 /** Parses a newline-delimited JSON HTTP stream, yielding one object per non-empty line. */
 async function* streamNdjson(path: string): AsyncGenerator<any> {
   const res = await lichessFetchOk(path);
