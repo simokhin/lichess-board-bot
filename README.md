@@ -84,6 +84,26 @@ offers, and game-end results arrive as bot messages.
 | `/draw` | Offer a draw, or accept one already offered |
 | `/nodraw` | Decline an offered draw |
 
+## Keeping it running
+
+`npm run dev` is fine for trying things out, but it stops the moment you close the terminal. For
+actually playing, you want the bot to keep running (and to come back on its own if it ever
+crashes or the machine reboots). The simplest way is [pm2](https://pm2.keymetrics.io/):
+
+```
+npm run build
+npm install -g pm2
+pm2 start dist/index.js --name lichess-board-bot
+pm2 save
+pm2 startup   # prints a command to run so pm2 survives a reboot — follow its instructions
+```
+
+Check on it any time with `pm2 logs lichess-board-bot` or `pm2 status`. A systemd service works
+just as well if you're already comfortable with that.
+
+Network hiccups (Wi-Fi dropping, lichess briefly unreachable) are handled automatically by the
+bot itself — a process manager is only needed to recover from an actual crash or a reboot.
+
 ## Project layout
 
 - `src/lichessClient.ts` — thin wrapper around the Lichess Board API (NDJSON streaming, moves, seek/challenge).
