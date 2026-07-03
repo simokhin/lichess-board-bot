@@ -50,11 +50,21 @@ export class GameManager {
     for (;;) {
       try {
         for await (const event of streamEvents()) {
-          if (event.type === "gameStart" && event.game?.id) {
-            this.attachGame(event.game.id).catch((err) =>
-              this.notify(`⚠️ Failed to connect to game: ${escapeMd((err as Error).message)}`),
+          if (event.type !== "gameStart" || !event.game?.id) continue;
+          const incomingGameId: string = event.game.id;
+
+          if (this.gameId !== null && this.gameId !== incomingGameId) {
+            this.notify(
+              `⚠️ Another game started while one is already active — ignoring it for now: ` +
+                `https://lichess.org/${incomingGameId}\n` +
+                `Finish or resign your current game first: ${this.getActiveGameLink()}`,
             );
+            continue;
           }
+
+          this.attachGame(incomingGameId).catch((err) =>
+            this.notify(`⚠️ Failed to connect to game: ${escapeMd((err as Error).message)}`),
+          );
         }
       } catch (err) {
         console.error("Event stream error:", err);
