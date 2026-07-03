@@ -98,8 +98,8 @@ test("renderBoard", async (t) => {
     const lines = diagram.split("\n");
     assert.equal(lines.length, 10); // header + 8 ranks + footer
     assert.equal(lines[0], "  a b c d e f g h");
-    assert.equal(lines[1], "8 ♜ ♞ ♝ ♛ ♚ ♝ ♞ ♜ 8");
-    assert.equal(lines[8], "1 ♖ ♘ ♗ ♕ ♔ ♗ ♘ ♖ 1");
+    assert.equal(lines[1], "8 ♖ ♘ ♗ ♕ ♔ ♗ ♘ ♖ 8");
+    assert.equal(lines[8], "1 ♜ ♞ ♝ ♛ ♚ ♝ ♞ ♜ 1");
     assert.equal(lines[9], "  a b c d e f g h");
   });
 
@@ -107,8 +107,8 @@ test("renderBoard", async (t) => {
     const diagram = renderBoard(new Chess(), "black");
     const lines = diagram.split("\n");
     assert.equal(lines[0], "  h g f e d c b a");
-    assert.equal(lines[1], "1 ♖ ♘ ♗ ♔ ♕ ♗ ♘ ♖ 1");
-    assert.equal(lines[8], "8 ♜ ♞ ♝ ♚ ♛ ♝ ♞ ♜ 8");
+    assert.equal(lines[1], "1 ♜ ♞ ♝ ♚ ♛ ♝ ♞ ♜ 1");
+    assert.equal(lines[8], "8 ♖ ♘ ♗ ♔ ♕ ♗ ♘ ♖ 8");
   });
 
   await t.test("renders empty squares as a middle dot", () => {

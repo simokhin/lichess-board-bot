@@ -50,9 +50,13 @@ export function replayMoves(uciMoves: string[]): { chess: Chess; sans: string[] 
   return { chess, sans };
 }
 
+// Unicode names these "WHITE CHESS ..." (♔♕♖♗♘♙, outline) and "BLACK CHESS ..." (♚♛♜♝♞♟,
+// filled), but Telegram's font renders that pairing visually backwards — the "white" codepoints
+// show up filled/dark and the "black" ones show up outlined/light. Swapped here to match what
+// actually displays in the app, since that's what matters for reading the board at a glance.
 const PIECE_UNICODE: Record<string, string> = {
-  wp: "♙", wn: "♘", wb: "♗", wr: "♖", wq: "♕", wk: "♔",
-  bp: "♟", bn: "♞", bb: "♝", br: "♜", bq: "♛", bk: "♚",
+  wp: "♟", wn: "♞", wb: "♝", wr: "♜", wq: "♛", wk: "♚",
+  bp: "♙", bn: "♘", bb: "♗", br: "♖", bq: "♕", bk: "♔",
 };
 
 /** Renders the board as a monospace diagram, oriented so the given color sits at the bottom. */
