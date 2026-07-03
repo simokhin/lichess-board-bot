@@ -25,9 +25,11 @@ opponent's moves come back as Telegram messages.
 - **Bullet and Blitz aren't supported.** The Board API's real-time seek only accepts time controls
   of Rapid speed or slower (`minutes * 60 + increment * 40 >= 480` seconds). This also fits the
   point of the project — bullet isn't very playable with a physical board anyway.
-- **No "play vs the computer".** Games created via lichess's AI-challenge endpoint aren't playable
-  through the Board API at all (Lichess rejects it), so there's no way to wire that up through the
-  public API for a regular account.
+- **`/newgame` can't start a game against the computer.** Games created via lichess's public
+  AI-challenge endpoint aren't playable through the Board API (Lichess rejects it), so there's no
+  way to wire that up from the bot. If you start a game against the computer on lichess.org or the
+  app directly, though, the bot picks it up and plays it like any other game — this limitation is
+  only about *creating* the game through the bot, not playing one.
 - One game and one Telegram chat at a time.
 
 ## Setup
@@ -103,6 +105,45 @@ just as well if you're already comfortable with that.
 
 Network hiccups (Wi-Fi dropping, lichess briefly unreachable) are handled automatically by the
 bot itself — a process manager is only needed to recover from an actual crash or a reboot.
+
+## Troubleshooting
+
+**The bot doesn't respond to anything.**
+Make sure the process is actually running (`npm run dev`, or `pm2 status` if you set that up) and
+that you've sent it `/start` at least once. If it's running but still silent, double-check
+`TELEGRAM_BOT_TOKEN` in `.env` — re-run `npm run setup` to have it re-verified against Telegram.
+
+**Moves fail, or the bot says Lichess rejected something.**
+Almost always a `LICHESS_TOKEN` problem — usually the token was created without the `board:play`
+scope. Re-run `npm run setup` and create a fresh token; the link it gives you pre-selects the
+right scope.
+
+**I started a game on lichess.org (or the app) and the bot never mentioned it.**
+Send `/sync` — it checks lichess directly for a game in progress and connects to it, no restart
+needed. This covers the bot having missed the notification (e.g. it was briefly offline when the
+game started).
+
+**"Looking for an opponent..." just sits there.**
+That's a live seek: it only matches once another real player is seeking the exact same time
+control at that moment, so it can take anywhere from a few seconds to a few minutes — this isn't
+the instant matchmaking you get from the lichess.org homepage. If it's been a long while, try
+`/newgame` again, or use "Challenge a friend" instead if you have someone specific in mind.
+
+**Bullet and Blitz aren't offered in Quick pairing.**
+Expected — see [Limitations](#limitations). Rapid (10+5, 15+10) and Classical (30+0, 30+20) are
+the fastest time controls the Board API supports for real-time seeks.
+
+**Can I play against the computer through the bot?**
+`/newgame` can't start one — see [Limitations](#limitations). But start a computer game on
+lichess.org or the app yourself, and the bot connects to it just like any other game.
+
+**I tapped a button and got "Menu was outdated, try again!"**
+Harmless — it means the bot's code changed (or it restarted) since that particular message was
+sent. Just run `/newgame` (or whichever command) again to get a fresh menu.
+
+**Something's wrong and I want to see exactly what the bot is telling Lichess.**
+Set `DEBUG_LICHESS=1` in `.env` and restart — every request, response, and stream message gets
+logged to the console.
 
 ## Project layout
 
