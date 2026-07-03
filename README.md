@@ -126,8 +126,11 @@ game started).
 **"Looking for an opponent..." just sits there.**
 That's a live seek: it only matches once another real player is seeking the exact same time
 control at that moment, so it can take anywhere from a few seconds to a few minutes — this isn't
-the instant matchmaking you get from the lichess.org homepage. If it's been a long while, try
-`/newgame` again, or use "Challenge a friend" instead if you have someone specific in mind.
+the instant matchmaking you get from the lichess.org homepage. (In earlier versions this could
+also hang indefinitely — the bot's own account-event connection was competing with the seek's
+connection over the same network path. The bot now closes that connection while a seek is
+pending and reopens it afterward, which fixed it in testing over a VPN; if it still never
+resolves for you, that's worth [reporting](https://github.com/simokhin/lichess-board-bot/issues).)
 
 **Bullet and Blitz aren't offered in Quick pairing.**
 Expected — see [Limitations](#limitations). Rapid (10+5, 15+10) and Classical (30+0, 30+20) are

@@ -50,8 +50,8 @@ export async function getCurrentGameId(): Promise<string | null> {
 }
 
 /** Parses a newline-delimited JSON HTTP stream, yielding one object per non-empty line. */
-async function* streamNdjson(path: string): AsyncGenerator<any> {
-  const res = await lichessFetchOk(path);
+async function* streamNdjson(path: string, signal?: AbortSignal): AsyncGenerator<any> {
+  const res = await lichessFetchOk(path, signal ? { signal } : {});
   if (!res.body) {
     throw new Error(`Stream ${path} returned no body`);
   }
@@ -82,9 +82,10 @@ async function* streamNdjson(path: string): AsyncGenerator<any> {
   }
 }
 
-/** Streams account-level events: gameStart, gameFinish, challenge, etc. Runs until the connection drops. */
-export function streamEvents(): AsyncGenerator<any> {
-  return streamNdjson("/api/stream/event");
+/** Streams account-level events: gameStart, gameFinish, challenge, etc. Runs until the connection
+ * drops, or is closed via `signal` (e.g. to free it up while placing a seek). */
+export function streamEvents(signal?: AbortSignal): AsyncGenerator<any> {
+  return streamNdjson("/api/stream/event", signal);
 }
 
 /** Streams full state + updates for a single game (Board API). */

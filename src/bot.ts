@@ -1,6 +1,6 @@
 import { Bot, type Context } from "grammy";
 import { Menu } from "@grammyjs/menu";
-import { challengeUser, seekGame, type TimeControl } from "./lichessClient.js";
+import { challengeUser, type TimeControl } from "./lichessClient.js";
 import { config } from "./config.js";
 import { GameManager } from "./gameManager.js";
 import { escapeMd } from "./format.js";
@@ -67,18 +67,9 @@ export function createBot(): { bot: Bot; gameManager: GameManager } {
           await ctx.editMessageText(activeGameNotice(), { parse_mode: "Markdown" });
           return;
         }
-        seekGame({ minutes: tc.minutes, increment: tc.increment, rated: true }).catch((err) => {
-          if (activeChatId !== undefined) {
-            bot.api
-              .sendMessage(activeChatId, `⚠️ Seek failed: ${escapeMd((err as Error).message)}`, {
-                parse_mode: "Markdown",
-              })
-              .catch(() => {});
-          }
-        });
+        const status = await gameManager.seekOpponent({ minutes: tc.minutes, increment: tc.increment, rated: true });
         await ctx.editMessageText(
-          `🔎 Looking for an opponent (${tc.minutes}+${tc.increment})...\n` +
-            `This can take anywhere from seconds to a few minutes. I'll message you here the moment it matches.`,
+          `${status}\nThis can take anywhere from seconds to a few minutes.`,
         );
       })
       .row();

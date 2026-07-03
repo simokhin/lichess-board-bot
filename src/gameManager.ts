@@ -8,8 +8,10 @@ import {
   makeMove,
   offerOrAcceptDraw,
   resignGame,
+  seekGame,
   streamEvents,
   streamGame,
+  type TimeControl,
 } from "./lichessClient.js";
 
 const RECONNECT_DELAY_MS = 3000;
@@ -29,6 +31,8 @@ export class GameManager {
   private opponentOfferedDraw = false;
   private whiteTimeMs: number | null = null;
   private blackTimeMs: number | null = null;
+  private eventStreamController: AbortController | null = null;
+  private eventStreamSuspended = false;
 
   constructor(private readonly notify: (text: string) => void) {}
 
@@ -70,8 +74,13 @@ export class GameManager {
 
   private async listenEvents(): Promise<void> {
     for (;;) {
+      if (this.eventStreamSuspended) {
+        await sleep(RECONNECT_DELAY_MS);
+        continue;
+      }
+      this.eventStreamController = new AbortController();
       try {
-        for await (const event of streamEvents()) {
+        for await (const event of streamEvents(this.eventStreamController.signal)) {
           if (event.type !== "gameStart" || !event.game?.id) continue;
           const incomingGameId: string = event.game.id;
 
@@ -89,10 +98,40 @@ export class GameManager {
           );
         }
       } catch (err) {
-        console.error("Event stream error:", err);
+        if (!this.eventStreamSuspended) console.error("Event stream error:", err);
+      } finally {
+        this.eventStreamController = null;
       }
       await sleep(RECONNECT_DELAY_MS);
     }
+  }
+
+  /**
+   * Closes the account event stream for the duration of `fn`, so a seek's own connection isn't
+   * competing with an already-open one to the same account. Resumes automatically afterward and
+   * checks for a game in progress, in case one was matched while the stream was down.
+   */
+  private async withEventStreamPaused<T>(fn: () => Promise<T>): Promise<T> {
+    this.eventStreamSuspended = true;
+    this.eventStreamController?.abort();
+    try {
+      return await fn();
+    } finally {
+      this.eventStreamSuspended = false;
+      this.syncActiveGame().catch((err) => console.error("Post-seek sync failed:", err));
+    }
+  }
+
+  /** Places a real-time seek. Returns immediately with a status message; the match (if any)
+   * arrives later as a notification. */
+  async seekOpponent(params: TimeControl & { rated: boolean }): Promise<string> {
+    if (this.gameId !== null) {
+      return `Already tracking a game: ${this.getActiveGameLink()}`;
+    }
+    this.withEventStreamPaused(() => seekGame(params)).catch((err) =>
+      this.notify(`⚠️ Seek failed: ${escapeMd((err as Error).message)}`),
+    );
+    return `🔎 Looking for an opponent (${params.minutes}+${params.increment})... I'll message you here the moment it matches.`;
   }
 
   private async attachGame(gameId: string): Promise<void> {
