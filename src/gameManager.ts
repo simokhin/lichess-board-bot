@@ -27,6 +27,16 @@ function applyUci(chess: Chess, uci: string): Move {
 
 const UCI_RE = /^([a-h][1-8])([a-h][1-8])([qrbn])?$/i;
 
+/** Accepts "0-0"/"0-0-0" (digit zero) as aliases for the SAN "O-O"/"O-O-O" castling notation. */
+function normalizeCastling(input: string): string {
+  const trimmed = input.trim();
+  const queenside = /^(?:o-o-o|0-0-0)([+#])?$/i.exec(trimmed);
+  if (queenside) return `O-O-O${queenside[1] ?? ""}`;
+  const kingside = /^(?:o-o|0-0)([+#])?$/i.exec(trimmed);
+  if (kingside) return `O-O${kingside[1] ?? ""}`;
+  return trimmed;
+}
+
 function formatClock(ms: number): string {
   const totalSeconds = Math.max(0, Math.round(ms / 1000));
   const hours = Math.floor(totalSeconds / 3600);
@@ -76,6 +86,14 @@ export class GameManager {
     this.accountId = account.id;
     this.notify(`Connected to lichess as ${account.username}. Waiting for a game to start...`);
     void this.listenEvents();
+  }
+
+  hasActiveGame(): boolean {
+    return this.gameId !== null;
+  }
+
+  getActiveGameLink(): string | null {
+    return this.gameId ? `https://lichess.org/${this.gameId}` : null;
   }
 
   private async listenEvents(): Promise<void> {
@@ -228,7 +246,7 @@ export class GameManager {
       return "It's not your turn.";
     }
 
-    const trimmed = input.trim();
+    const trimmed = normalizeCastling(input);
     const testChess = new Chess(this.chess.fen());
     let move: Move | null = null;
 

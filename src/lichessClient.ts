@@ -3,6 +3,9 @@ import { config } from "./config.js";
 const LICHESS_BASE = "https://lichess.org";
 
 async function lichessFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const method = init.method ?? "GET";
+  const bodyText = init.body instanceof URLSearchParams ? init.body.toString() : undefined;
+  console.log(`[lichess] -> ${method} ${path}${bodyText ? ` body=${bodyText}` : ""}`);
   const res = await fetch(`${LICHESS_BASE}${path}`, {
     ...init,
     headers: {
@@ -10,6 +13,7 @@ async function lichessFetch(path: string, init: RequestInit = {}): Promise<Respo
       ...init.headers,
     },
   });
+  console.log(`[lichess] <- ${res.status} ${method} ${path}`);
   return res;
 }
 
@@ -17,6 +21,7 @@ async function lichessFetchOk(path: string, init: RequestInit = {}): Promise<Res
   const res = await lichessFetch(path, init);
   if (!res.ok) {
     const body = await res.text().catch(() => "");
+    console.log(`[lichess] <- error body: ${body}`);
     throw new Error(`Lichess ${init.method ?? "GET"} ${path} failed: ${res.status} ${body}`);
   }
   return res;
@@ -38,6 +43,7 @@ async function* streamNdjson(path: string): AsyncGenerator<any> {
   if (!res.body) {
     throw new Error(`Stream ${path} returned no body`);
   }
+  console.log(`[lichess] stream open: ${path}`);
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -50,11 +56,17 @@ async function* streamNdjson(path: string): AsyncGenerator<any> {
       while ((newlineIndex = buffer.indexOf("\n")) >= 0) {
         const line = buffer.slice(0, newlineIndex).trim();
         buffer = buffer.slice(newlineIndex + 1);
-        if (line) yield JSON.parse(line);
+        if (line) {
+          console.log(`[lichess] stream ${path} <- ${line}`);
+          yield JSON.parse(line);
+        } else {
+          console.log(`[lichess] stream ${path} <- (heartbeat)`);
+        }
       }
     }
   } finally {
     reader.releaseLock();
+    console.log(`[lichess] stream closed: ${path}`);
   }
 }
 
@@ -85,4 +97,48 @@ export async function offerOrAcceptDraw(gameId: string): Promise<void> {
 /** Declines a draw offered by the opponent. */
 export async function declineDraw(gameId: string): Promise<void> {
   await lichessFetchOk(`/api/board/game/${gameId}/draw/no`, { method: "POST" });
+}
+
+export interface TimeControl {
+  minutes: number;
+  increment: number;
+}
+
+/**
+ * Places a real-time seek for a random opponent. The underlying HTTP request must stay open
+ * for the seek to remain active, so this resolves only once matched, cancelled, or timed out;
+ * callers should not await it before responding to the user.
+ */
+export async function seekGame(params: TimeControl & { rated: boolean }): Promise<void> {
+  const body = new URLSearchParams({
+    rated: String(params.rated),
+    time: String(params.minutes),
+    increment: String(params.increment),
+  });
+  const res = await lichessFetchOk("/api/board/seek", { method: "POST", body });
+  if (!res.body) return;
+  console.log("[lichess] seek stream open: /api/board/seek");
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const text = decoder.decode(value, { stream: true }).trim();
+      console.log(`[lichess] seek stream <- ${text ? text : "(heartbeat)"}`);
+    }
+  } finally {
+    reader.releaseLock();
+    console.log("[lichess] seek stream closed: /api/board/seek");
+  }
+}
+
+/** Sends a direct challenge to another lichess user; the game starts once they accept. */
+export async function challengeUser(username: string, params: TimeControl & { rated: boolean }): Promise<void> {
+  const body = new URLSearchParams({
+    rated: String(params.rated),
+    "clock.limit": String(params.minutes * 60),
+    "clock.increment": String(params.increment),
+  });
+  await lichessFetchOk(`/api/challenge/${encodeURIComponent(username)}`, { method: "POST", body });
 }
