@@ -36,6 +36,29 @@ function formatClock(ms: number): string {
   return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
 }
 
+const PIECE_UNICODE: Record<string, string> = {
+  wp: "♙", wn: "♘", wb: "♗", wr: "♖", wq: "♕", wk: "♔",
+  bp: "♟", bn: "♞", bb: "♝", br: "♜", bq: "♛", bk: "♚",
+};
+
+/** Renders the board as a monospace diagram, oriented so the given color sits at the bottom. */
+function renderBoard(chess: Chess, orientation: Color): string {
+  const board = chess.board(); // board[0] = rank 8 ... board[7] = rank 1, each row a..h
+  const files = orientation === "white" ? "abcdefgh".split("") : "hgfedcba".split("");
+  const rankIndices = orientation === "white" ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
+
+  const lines = [`  ${files.join(" ")}`];
+  for (const rankIndex of rankIndices) {
+    const rankNumber = 8 - rankIndex;
+    const row = board[rankIndex];
+    const squares = orientation === "white" ? row : [...row].reverse();
+    const rowStr = squares.map((sq) => (sq ? PIECE_UNICODE[sq.color + sq.type] : "·")).join(" ");
+    lines.push(`${rankNumber} ${rowStr} ${rankNumber}`);
+  }
+  lines.push(`  ${files.join(" ")}`);
+  return lines.join("\n");
+}
+
 export class GameManager {
   private accountId: string | null = null;
   private gameId: string | null = null;
@@ -291,6 +314,9 @@ export class GameManager {
       `Вы играете: ${this.myColor === "white" ? "белыми" : "чёрными"}\n` +
       `Ход: ${isMyTurn ? "ваш" : "соперника"}\n` +
       clockLine +
+      "```\n" +
+      renderBoard(this.chess, this.myColor) +
+      "\n```\n" +
       `FEN: ${this.chess.fen()}`
     );
   }

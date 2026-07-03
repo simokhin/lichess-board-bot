@@ -33,7 +33,7 @@ export function createBot(): { bot: Bot; gameManager: GameManager } {
   });
 
   bot.command("status", async (ctx) => {
-    await ctx.reply(gameManager.getStatus());
+    await ctx.reply(gameManager.getStatus(), { parse_mode: "Markdown" });
   });
 
   bot.command("resign", async (ctx) => {
