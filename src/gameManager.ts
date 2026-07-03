@@ -1,4 +1,6 @@
-import { Chess, type Move } from "chess.js";
+import { Chess } from "chess.js";
+import { parseMoveInput, renderBoard, replayMoves, type Color } from "./chessUtils.js";
+import { escapeMd, formatClock } from "./format.js";
 import {
   declineDraw,
   getAccount,
@@ -9,70 +11,11 @@ import {
   streamGame,
 } from "./lichessClient.js";
 
-type Color = "white" | "black";
-
 const RECONNECT_DELAY_MS = 3000;
 const MAX_GAME_RECONNECT_ATTEMPTS = 5;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function applyUci(chess: Chess, uci: string): Move {
-  const from = uci.slice(0, 2);
-  const to = uci.slice(2, 4);
-  const promotion = uci.length > 4 ? uci.slice(4, 5) : undefined;
-  return chess.move({ from, to, promotion });
-}
-
-const UCI_RE = /^([a-h][1-8])([a-h][1-8])([qrbn])?$/i;
-
-/** Accepts "0-0"/"0-0-0" (digit zero) as aliases for the SAN "O-O"/"O-O-O" castling notation. */
-function normalizeCastling(input: string): string {
-  const trimmed = input.trim();
-  const queenside = /^(?:o-o-o|0-0-0)([+#])?$/i.exec(trimmed);
-  if (queenside) return `O-O-O${queenside[1] ?? ""}`;
-  const kingside = /^(?:o-o|0-0)([+#])?$/i.exec(trimmed);
-  if (kingside) return `O-O${kingside[1] ?? ""}`;
-  return trimmed;
-}
-
-function formatClock(ms: number): string {
-  const totalSeconds = Math.max(0, Math.round(ms / 1000));
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
-}
-
-/** Escapes legacy Telegram Markdown special characters in untrusted text (names, error bodies)
- * before it's interpolated into a message sent with parse_mode: "Markdown". */
-export function escapeMd(text: string): string {
-  return text.replace(/([_*`[])/g, "\\$1");
-}
-
-const PIECE_UNICODE: Record<string, string> = {
-  wp: "♙", wn: "♘", wb: "♗", wr: "♖", wq: "♕", wk: "♔",
-  bp: "♟", bn: "♞", bb: "♝", br: "♜", bq: "♛", bk: "♚",
-};
-
-/** Renders the board as a monospace diagram, oriented so the given color sits at the bottom. */
-function renderBoard(chess: Chess, orientation: Color): string {
-  const board = chess.board(); // board[0] = rank 8 ... board[7] = rank 1, each row a..h
-  const files = orientation === "white" ? "abcdefgh".split("") : "hgfedcba".split("");
-  const rankIndices = orientation === "white" ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
-
-  const lines = [`  ${files.join(" ")}`];
-  for (const rankIndex of rankIndices) {
-    const rankNumber = 8 - rankIndex;
-    const row = board[rankIndex];
-    const squares = orientation === "white" ? row : [...row].reverse();
-    const rowStr = squares.map((sq) => (sq ? PIECE_UNICODE[sq.color + sq.type] : "·")).join(" ");
-    lines.push(`${rankNumber} ${rowStr} ${rankNumber}`);
-  }
-  lines.push(`  ${files.join(" ")}`);
-  return lines.join("\n");
 }
 
 export class GameManager {
@@ -181,12 +124,7 @@ export class GameManager {
   private handleGameState(state: any): void {
     const uciMoves: string[] = state.moves ? state.moves.split(" ").filter(Boolean) : [];
 
-    const chess = new Chess();
-    const sans: string[] = [];
-    for (const uci of uciMoves) {
-      const move = applyUci(chess, uci);
-      sans.push(move.san);
-    }
+    const { chess, sans } = replayMoves(uciMoves);
     this.chess = chess;
     this.lastMoveSan = sans.length > 0 ? sans[sans.length - 1] : null;
 
@@ -255,23 +193,7 @@ export class GameManager {
       return "⏳ It's not your turn.";
     }
 
-    const trimmed = normalizeCastling(input);
-    const testChess = new Chess(this.chess.fen());
-    let move: Move | null = null;
-
-    try {
-      move = testChess.move(trimmed);
-    } catch {
-      const uciMatch = UCI_RE.exec(trimmed);
-      if (uciMatch) {
-        try {
-          move = testChess.move({ from: uciMatch[1], to: uciMatch[2], promotion: uciMatch[3] });
-        } catch {
-          move = null;
-        }
-      }
-    }
-
+    const move = parseMoveInput(this.chess.fen(), input);
     if (!move) {
       return `❓ Couldn't parse move "${escapeMd(input)}". Use SAN (e4, Nf3, O-O) or UCI (e2e4).`;
     }

@@ -2,7 +2,8 @@ import { Bot, type Context } from "grammy";
 import { Menu } from "@grammyjs/menu";
 import { challengeUser, seekGame, type TimeControl } from "./lichessClient.js";
 import { config } from "./config.js";
-import { escapeMd, GameManager } from "./gameManager.js";
+import { GameManager } from "./gameManager.js";
+import { escapeMd } from "./format.js";
 
 let activeChatId: number | undefined = config.allowedChatId;
 let awaitingChallengeUsername = false;
