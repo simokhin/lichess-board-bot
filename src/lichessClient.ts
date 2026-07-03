@@ -2,10 +2,15 @@ import { config } from "./config.js";
 
 const LICHESS_BASE = "https://lichess.org";
 
+/** Logs Lichess API request/response/stream activity, gated behind DEBUG_LICHESS=1. */
+function debugLog(message: string): void {
+  if (config.debugLichess) console.log(message);
+}
+
 async function lichessFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const method = init.method ?? "GET";
   const bodyText = init.body instanceof URLSearchParams ? init.body.toString() : undefined;
-  console.log(`[lichess] -> ${method} ${path}${bodyText ? ` body=${bodyText}` : ""}`);
+  debugLog(`[lichess] -> ${method} ${path}${bodyText ? ` body=${bodyText}` : ""}`);
   const res = await fetch(`${LICHESS_BASE}${path}`, {
     ...init,
     headers: {
@@ -13,7 +18,7 @@ async function lichessFetch(path: string, init: RequestInit = {}): Promise<Respo
       ...init.headers,
     },
   });
-  console.log(`[lichess] <- ${res.status} ${method} ${path}`);
+  debugLog(`[lichess] <- ${res.status} ${method} ${path}`);
   return res;
 }
 
@@ -21,7 +26,7 @@ async function lichessFetchOk(path: string, init: RequestInit = {}): Promise<Res
   const res = await lichessFetch(path, init);
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    console.log(`[lichess] <- error body: ${body}`);
+    debugLog(`[lichess] <- error body: ${body}`);
     throw new Error(`Lichess ${init.method ?? "GET"} ${path} failed: ${res.status} ${body}`);
   }
   return res;
@@ -43,7 +48,7 @@ async function* streamNdjson(path: string): AsyncGenerator<any> {
   if (!res.body) {
     throw new Error(`Stream ${path} returned no body`);
   }
-  console.log(`[lichess] stream open: ${path}`);
+  debugLog(`[lichess] stream open: ${path}`);
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -57,16 +62,16 @@ async function* streamNdjson(path: string): AsyncGenerator<any> {
         const line = buffer.slice(0, newlineIndex).trim();
         buffer = buffer.slice(newlineIndex + 1);
         if (line) {
-          console.log(`[lichess] stream ${path} <- ${line}`);
+          debugLog(`[lichess] stream ${path} <- ${line}`);
           yield JSON.parse(line);
         } else {
-          console.log(`[lichess] stream ${path} <- (heartbeat)`);
+          debugLog(`[lichess] stream ${path} <- (heartbeat)`);
         }
       }
     }
   } finally {
     reader.releaseLock();
-    console.log(`[lichess] stream closed: ${path}`);
+    debugLog(`[lichess] stream closed: ${path}`);
   }
 }
 
@@ -117,7 +122,7 @@ export async function seekGame(params: TimeControl & { rated: boolean }): Promis
   });
   const res = await lichessFetchOk("/api/board/seek", { method: "POST", body });
   if (!res.body) return;
-  console.log("[lichess] seek stream open: /api/board/seek");
+  debugLog("[lichess] seek stream open: /api/board/seek");
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   try {
@@ -125,11 +130,11 @@ export async function seekGame(params: TimeControl & { rated: boolean }): Promis
       const { done, value } = await reader.read();
       if (done) break;
       const text = decoder.decode(value, { stream: true }).trim();
-      console.log(`[lichess] seek stream <- ${text ? text : "(heartbeat)"}`);
+      debugLog(`[lichess] seek stream <- ${text ? text : "(heartbeat)"}`);
     }
   } finally {
     reader.releaseLock();
-    console.log("[lichess] seek stream closed: /api/board/seek");
+    debugLog("[lichess] seek stream closed: /api/board/seek");
   }
 }
 

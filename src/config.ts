@@ -14,4 +14,5 @@ export const config = {
   allowedChatId: process.env.TELEGRAM_ALLOWED_CHAT_ID
     ? Number(process.env.TELEGRAM_ALLOWED_CHAT_ID)
     : undefined,
+  debugLichess: process.env.DEBUG_LICHESS === "1",
 };

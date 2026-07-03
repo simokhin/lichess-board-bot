@@ -39,6 +39,8 @@ opponent's moves come back as Telegram messages.
      **`board:play`** scope.
    - `TELEGRAM_ALLOWED_CHAT_ID` *(optional)* — restrict the bot to a single chat. Leave blank
      initially; send `/start` to the bot and it will reply with your chat id.
+   - `DEBUG_LICHESS` *(optional)* — set to `1` to log every Lichess API request, response, and
+     stream message to the console.
 3. Run it:
    ```
    npm run dev
