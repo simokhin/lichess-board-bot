@@ -27,6 +27,15 @@ function applyUci(chess: Chess, uci: string): Move {
 
 const UCI_RE = /^([a-h][1-8])([a-h][1-8])([qrbn])?$/i;
 
+function formatClock(ms: number): string {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
+}
+
 export class GameManager {
   private accountId: string | null = null;
   private gameId: string | null = null;
@@ -34,6 +43,8 @@ export class GameManager {
   private chess = new Chess();
   private appliedMoveCount = 0;
   private opponentOfferedDraw = false;
+  private whiteTimeMs: number | null = null;
+  private blackTimeMs: number | null = null;
 
   constructor(private readonly notify: (text: string) => void) {}
 
@@ -68,6 +79,8 @@ export class GameManager {
     this.appliedMoveCount = 0;
     this.myColor = null;
     this.opponentOfferedDraw = false;
+    this.whiteTimeMs = null;
+    this.blackTimeMs = null;
 
     let attempt = 0;
     while (this.gameId === gameId) {
@@ -127,11 +140,18 @@ export class GameManager {
     }
     this.chess = chess;
 
+    if (typeof state.wtime === "number") this.whiteTimeMs = state.wtime;
+    if (typeof state.btime === "number") this.blackTimeMs = state.btime;
+    const clockSuffix =
+      this.whiteTimeMs !== null && this.blackTimeMs !== null
+        ? ` (белые: ${formatClock(this.whiteTimeMs)}, чёрные: ${formatClock(this.blackTimeMs)})`
+        : "";
+
     if (uciMoves.length > this.appliedMoveCount && this.myColor) {
       for (let i = this.appliedMoveCount; i < uciMoves.length; i++) {
         const moverColor: Color = i % 2 === 0 ? "white" : "black";
         if (moverColor !== this.myColor) {
-          this.notify(`Соперник сыграл: ${sans[i]}`);
+          this.notify(`Соперник сыграл: ${sans[i]}${clockSuffix}`);
         }
       }
     }
@@ -209,7 +229,11 @@ export class GameManager {
     const uci = move.from + move.to + (move.promotion ?? "");
     try {
       await makeMove(this.gameId, uci);
-      return `✅ Ход отправлен: ${move.san}`;
+      const clockSuffix =
+        this.whiteTimeMs !== null && this.blackTimeMs !== null
+          ? ` (белые: ${formatClock(this.whiteTimeMs)}, чёрные: ${formatClock(this.blackTimeMs)})`
+          : "";
+      return `✅ Ход отправлен: ${move.san}${clockSuffix}`;
     } catch (err) {
       return `Lichess отклонил ход: ${(err as Error).message}`;
     }
@@ -258,10 +282,15 @@ export class GameManager {
     }
     const turnColor: Color = this.chess.turn() === "w" ? "white" : "black";
     const isMyTurn = turnColor === this.myColor;
+    const clockLine =
+      this.whiteTimeMs !== null && this.blackTimeMs !== null
+        ? `Часы: белые ${formatClock(this.whiteTimeMs)} — чёрные ${formatClock(this.blackTimeMs)}\n`
+        : "";
     return (
       `Партия: https://lichess.org/${this.gameId}\n` +
       `Вы играете: ${this.myColor === "white" ? "белыми" : "чёрными"}\n` +
       `Ход: ${isMyTurn ? "ваш" : "соперника"}\n` +
+      clockLine +
       `FEN: ${this.chess.fen()}`
     );
   }
