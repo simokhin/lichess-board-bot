@@ -46,6 +46,12 @@ function formatClock(ms: number): string {
   return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
 }
 
+/** Escapes legacy Telegram Markdown special characters in untrusted text (names, error bodies)
+ * before it's interpolated into a message sent with parse_mode: "Markdown". */
+export function escapeMd(text: string): string {
+  return text.replace(/([_*`[])/g, "\\$1");
+}
+
 const PIECE_UNICODE: Record<string, string> = {
   wp: "♙", wn: "♘", wb: "♗", wr: "♖", wq: "♕", wk: "♔",
   bp: "♟", bn: "♞", bb: "♝", br: "♜", bq: "♛", bk: "♚",
@@ -75,6 +81,7 @@ export class GameManager {
   private myColor: Color | null = null;
   private chess = new Chess();
   private appliedMoveCount = 0;
+  private lastMoveSan: string | null = null;
   private opponentOfferedDraw = false;
   private whiteTimeMs: number | null = null;
   private blackTimeMs: number | null = null;
@@ -84,7 +91,7 @@ export class GameManager {
   async start(): Promise<void> {
     const account = await getAccount();
     this.accountId = account.id;
-    this.notify(`Connected to lichess as ${account.username}. Waiting for a game to start...`);
+    this.notify(`👋 Connected to lichess as *${escapeMd(account.username)}*. Waiting for a game to start...`);
     void this.listenEvents();
   }
 
@@ -102,7 +109,7 @@ export class GameManager {
         for await (const event of streamEvents()) {
           if (event.type === "gameStart" && event.game?.id) {
             this.attachGame(event.game.id).catch((err) =>
-              this.notify(`Failed to connect to game: ${(err as Error).message}`),
+              this.notify(`⚠️ Failed to connect to game: ${escapeMd((err as Error).message)}`),
             );
           }
         }
@@ -118,6 +125,7 @@ export class GameManager {
     this.gameId = gameId;
     this.chess = new Chess();
     this.appliedMoveCount = 0;
+    this.lastMoveSan = null;
     this.myColor = null;
     this.opponentOfferedDraw = false;
     this.whiteTimeMs = null;
@@ -146,12 +154,12 @@ export class GameManager {
 
       if (attempt > MAX_GAME_RECONNECT_ATTEMPTS) {
         this.notify(
-          `Could not restore the connection to the game after ${MAX_GAME_RECONNECT_ATTEMPTS} attempts: https://lichess.org/${gameId}`,
+          `⚠️ Could not restore the connection to the game after ${MAX_GAME_RECONNECT_ATTEMPTS} attempts: https://lichess.org/${gameId}`,
         );
         this.gameId = null;
         return;
       }
-      this.notify(`Lost connection to the game, reconnecting... (attempt ${attempt}/${MAX_GAME_RECONNECT_ATTEMPTS})`);
+      this.notify(`⚠️ Lost connection to the game, reconnecting... (attempt ${attempt}/${MAX_GAME_RECONNECT_ATTEMPTS})`);
       await sleep(RECONNECT_DELAY_MS);
     }
   }
@@ -163,8 +171,8 @@ export class GameManager {
     const opponentName = opponent.name ?? (opponent.aiLevel ? `Stockfish (level ${opponent.aiLevel})` : "opponent");
 
     this.notify(
-      `Game started: https://lichess.org/${msg.id}\n` +
-        `You're playing ${this.myColor === "white" ? "white" : "black"} against ${opponentName}.`,
+      `🏁 *Game started:* https://lichess.org/${msg.id}\n` +
+        `You're playing *${this.myColor === "white" ? "white" : "black"}* against ${escapeMd(opponentName)}.`,
     );
 
     this.handleGameState(msg.state);
@@ -180,19 +188,20 @@ export class GameManager {
       sans.push(move.san);
     }
     this.chess = chess;
+    this.lastMoveSan = sans.length > 0 ? sans[sans.length - 1] : null;
 
     if (typeof state.wtime === "number") this.whiteTimeMs = state.wtime;
     if (typeof state.btime === "number") this.blackTimeMs = state.btime;
     const clockSuffix =
       this.whiteTimeMs !== null && this.blackTimeMs !== null
-        ? ` (white: ${formatClock(this.whiteTimeMs)}, black: ${formatClock(this.blackTimeMs)})`
+        ? ` (⏱ white: ${formatClock(this.whiteTimeMs)}, black: ${formatClock(this.blackTimeMs)})`
         : "";
 
     if (uciMoves.length > this.appliedMoveCount && this.myColor) {
       for (let i = this.appliedMoveCount; i < uciMoves.length; i++) {
         const moverColor: Color = i % 2 === 0 ? "white" : "black";
         if (moverColor !== this.myColor) {
-          this.notify(`Opponent played: ${sans[i]}${clockSuffix}`);
+          this.notify(`♟️ *Opponent played:* ${sans[i]}${clockSuffix}`);
         }
       }
     }
@@ -202,7 +211,7 @@ export class GameManager {
       const opponentColor: Color = this.myColor === "white" ? "black" : "white";
       const opponentDrawFlag: boolean = Boolean(opponentColor === "white" ? state.wdraw : state.bdraw);
       if (opponentDrawFlag && !this.opponentOfferedDraw) {
-        this.notify("🤝 Opponent offers a draw. Send /draw to accept, or /nodraw to decline.");
+        this.notify("🤝 *Opponent offers a draw.* Send /draw to accept, or /nodraw to decline.");
       }
       this.opponentOfferedDraw = opponentDrawFlag;
     }
@@ -229,10 +238,10 @@ export class GameManager {
     const statusText = statusNames[state.status] ?? state.status;
 
     if (!state.winner) {
-      return `Game over: ${statusText}.`;
+      return `🏁 *Game over:* ${statusText}.`;
     }
     const iWon = state.winner === this.myColor;
-    return `Game over: ${statusText}. ${iWon ? "You won! 🎉" : "You lost."}`;
+    return `🏁 *Game over:* ${statusText}. ${iWon ? "You won! 🎉" : "You lost."}`;
   }
 
   /** Parses and submits a user-entered move (SAN or UCI). Returns a reply string for the chat. */
@@ -243,7 +252,7 @@ export class GameManager {
 
     const turnColor: Color = this.chess.turn() === "w" ? "white" : "black";
     if (turnColor !== this.myColor) {
-      return "It's not your turn.";
+      return "⏳ It's not your turn.";
     }
 
     const trimmed = normalizeCastling(input);
@@ -264,7 +273,7 @@ export class GameManager {
     }
 
     if (!move) {
-      return `Couldn't parse move "${input}". Use SAN (e4, Nf3, O-O) or UCI (e2e4).`;
+      return `❓ Couldn't parse move "${escapeMd(input)}". Use SAN (e4, Nf3, O-O) or UCI (e2e4).`;
     }
 
     const uci = move.from + move.to + (move.promotion ?? "");
@@ -272,11 +281,11 @@ export class GameManager {
       await makeMove(this.gameId, uci);
       const clockSuffix =
         this.whiteTimeMs !== null && this.blackTimeMs !== null
-          ? ` (white: ${formatClock(this.whiteTimeMs)}, black: ${formatClock(this.blackTimeMs)})`
+          ? ` (⏱ white: ${formatClock(this.whiteTimeMs)}, black: ${formatClock(this.blackTimeMs)})`
           : "";
-      return `✅ Move sent: ${move.san}${clockSuffix}`;
+      return `✅ *Move sent:* ${move.san}${clockSuffix}`;
     } catch (err) {
-      return `Lichess rejected the move: ${(err as Error).message}`;
+      return `⚠️ Lichess rejected the move: ${escapeMd((err as Error).message)}`;
     }
   }
 
@@ -286,9 +295,9 @@ export class GameManager {
     }
     try {
       await resignGame(this.gameId);
-      return "You resigned.";
+      return "🏳️ You resigned.";
     } catch (err) {
-      return `Failed to resign: ${(err as Error).message}`;
+      return `⚠️ Failed to resign: ${escapeMd((err as Error).message)}`;
     }
   }
 
@@ -299,9 +308,9 @@ export class GameManager {
     }
     try {
       await offerOrAcceptDraw(this.gameId);
-      return this.opponentOfferedDraw ? "Draw accepted." : "Draw offer sent.";
+      return this.opponentOfferedDraw ? "🤝 Draw accepted." : "🤝 Draw offer sent.";
     } catch (err) {
-      return `Failed to offer a draw: ${(err as Error).message}`;
+      return `⚠️ Failed to offer a draw: ${escapeMd((err as Error).message)}`;
     }
   }
 
@@ -313,25 +322,28 @@ export class GameManager {
       await declineDraw(this.gameId);
       return "Draw offer declined.";
     } catch (err) {
-      return `Failed to decline the draw: ${(err as Error).message}`;
+      return `⚠️ Failed to decline the draw: ${escapeMd((err as Error).message)}`;
     }
   }
 
   getStatus(): string {
     if (!this.gameId || !this.myColor) {
-      return "No active game. Start one on lichess.org — I'll connect automatically.";
+      return "No active game. Start one on lichess.org, or use /newgame — I'll connect automatically.";
     }
     const turnColor: Color = this.chess.turn() === "w" ? "white" : "black";
     const isMyTurn = turnColor === this.myColor;
+    const turnLine = isMyTurn ? "🟢 *Your turn*" : "⏳ *Opponent's turn*";
     const clockLine =
       this.whiteTimeMs !== null && this.blackTimeMs !== null
-        ? `Clock: white ${formatClock(this.whiteTimeMs)} — black ${formatClock(this.blackTimeMs)}\n`
+        ? `⏱ Clock: white ${formatClock(this.whiteTimeMs)} — black ${formatClock(this.blackTimeMs)}\n`
         : "";
+    const lastMoveLine = this.lastMoveSan ? `Last move: ${this.lastMoveSan}\n` : "";
     return (
       `Game: https://lichess.org/${this.gameId}\n` +
       `You're playing: ${this.myColor}\n` +
-      `Turn: ${isMyTurn ? "yours" : "opponent's"}\n` +
+      `${turnLine}\n` +
       clockLine +
+      lastMoveLine +
       "```\n" +
       renderBoard(this.chess, this.myColor) +
       "\n```\n" +
