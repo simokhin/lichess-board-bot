@@ -7,6 +7,8 @@ Play on a real board while your opponent plays online: send your moves to the bo
 and it forwards them to lichess via the [Board API](https://lichess.org/api#tag/Board); your
 opponent's moves come back as Telegram messages.
 
+![Demo: sending a move to the bot and getting a confirmation](docs/demo.gif)
+
 ## Features
 
 - Auto-connects to your active game as soon as it starts — on lichess or via `/newgame` — and
