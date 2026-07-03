@@ -3,6 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/simokhin/lichess-board-bot.git"
+  },
+  "homepage": "https://github.com/simokhin/lichess-board-bot#readme",
+  "bugs": {
+    "url": "https://github.com/simokhin/lichess-board-bot/issues"
+  },
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",

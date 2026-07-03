@@ -1,5 +1,7 @@
 # Lichess Board Bot
 
+[![CI](https://github.com/simokhin/lichess-board-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/simokhin/lichess-board-bot/actions/workflows/ci.yml)
+
 A Telegram bot that bridges a [lichess.org](https://lichess.org) game to a physical chess board.
 Play on a real board while your opponent plays online: send your moves to the bot as plain text,
 and it forwards them to lichess via the [Board API](https://lichess.org/api#tag/Board); your
