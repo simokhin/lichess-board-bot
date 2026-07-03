@@ -1,10 +1,11 @@
-import { createBot } from "./bot.js";
+import { BOT_COMMANDS, createBot } from "./bot.js";
 
 async function main() {
   const { bot, gameManager } = createBot();
 
   bot.catch((err) => console.error("Bot error:", err));
 
+  await bot.api.setMyCommands(BOT_COMMANDS);
   await gameManager.start();
   await bot.start();
 }

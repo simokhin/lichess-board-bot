@@ -1,4 +1,5 @@
-import { Bot, InlineKeyboard, type Context } from "grammy";
+import { Bot, type Context } from "grammy";
+import { Menu } from "@grammyjs/menu";
 import { challengeUser, seekGame, type TimeControl } from "./lichessClient.js";
 import { config } from "./config.js";
 import { GameManager } from "./gameManager.js";
@@ -17,15 +18,14 @@ const SEEK_TIME_CONTROLS: Array<TimeControl & { label: string }> = [
 
 const FRIEND_TIME_CONTROL: TimeControl = { minutes: 10, increment: 5 };
 
-/** Best-effort ack: a callback query can be stale (e.g. pressed while the bot was restarting), in
- * which case Telegram rejects the ack — that shouldn't abort the rest of the handler. */
-async function safeAnswerCallback(ctx: Context): Promise<void> {
-  try {
-    await ctx.answerCallbackQuery();
-  } catch (err) {
-    console.warn("answerCallbackQuery failed (stale callback query):", (err as Error).message);
-  }
-}
+export const BOT_COMMANDS = [
+  { command: "start", description: "Show help and register this chat" },
+  { command: "newgame", description: "Start a game (seek or challenge a friend)" },
+  { command: "status", description: "Show the board, turn, and clock" },
+  { command: "resign", description: "Resign the current game" },
+  { command: "draw", description: "Offer or accept a draw" },
+  { command: "nodraw", description: "Decline an offered draw" },
+];
 
 export function createBot(): { bot: Bot; gameManager: GameManager } {
   const bot = new Bot(config.telegramToken);
@@ -37,6 +37,47 @@ export function createBot(): { bot: Bot; gameManager: GameManager } {
     bot.api.sendMessage(activeChatId, text).catch((err) => console.error("sendMessage failed:", err));
   });
 
+  const activeGameNotice = () => `You already have an active game: ${gameManager.getActiveGameLink()}`;
+
+  const seekMenu = new Menu<Context>("seek-menu");
+  for (const tc of SEEK_TIME_CONTROLS) {
+    seekMenu
+      .text(tc.label, async (ctx) => {
+        if (gameManager.hasActiveGame()) {
+          await ctx.editMessageText(activeGameNotice());
+          return;
+        }
+        seekGame({ minutes: tc.minutes, increment: tc.increment, rated: true }).catch((err) => {
+          if (activeChatId !== undefined) {
+            bot.api.sendMessage(activeChatId, `Seek failed: ${(err as Error).message}`).catch(() => {});
+          }
+        });
+        await ctx.editMessageText(
+          `Looking for an opponent (${tc.minutes}+${tc.increment})... I'll message you when the game starts.`,
+        );
+      })
+      .row();
+  }
+  seekMenu.back("◀ Back");
+
+  const newGameMenu = new Menu<Context>("newgame-menu")
+    .submenu("🎲 Quick pairing", "seek-menu", async (ctx) => {
+      await ctx.editMessageText("Pick a time control (rated pairing):");
+    })
+    .row()
+    .text("👤 Challenge a friend", async (ctx) => {
+      if (gameManager.hasActiveGame()) {
+        await ctx.editMessageText(activeGameNotice());
+        return;
+      }
+      awaitingChallengeUsername = true;
+      await ctx.editMessageText(
+        `Send the lichess username of the friend you want to challenge ` +
+          `(${FRIEND_TIME_CONTROL.minutes}+${FRIEND_TIME_CONTROL.increment}, casual).`,
+      );
+    });
+  newGameMenu.register(seekMenu);
+
   bot.use((ctx, next) => {
     if (config.allowedChatId !== undefined && ctx.chat?.id !== config.allowedChatId) {
       return; // ignore messages from anyone but the configured owner
@@ -46,6 +87,8 @@ export function createBot(): { bot: Bot; gameManager: GameManager } {
     }
     return next();
   });
+
+  bot.use(newGameMenu);
 
   bot.command("start", async (ctx) => {
     await ctx.reply(
@@ -59,54 +102,10 @@ export function createBot(): { bot: Bot; gameManager: GameManager } {
 
   bot.command("newgame", async (ctx) => {
     if (gameManager.hasActiveGame()) {
-      await ctx.reply(`You already have an active game: ${gameManager.getActiveGameLink()}`);
+      await ctx.reply(activeGameNotice());
       return;
     }
-    const keyboard = new InlineKeyboard()
-      .text("🎲 Quick pairing", "newgame:seek")
-      .row()
-      .text("👤 Challenge a friend", "newgame:friend");
-    await ctx.reply("How would you like to start a game?", { reply_markup: keyboard });
-  });
-
-  bot.callbackQuery("newgame:seek", async (ctx) => {
-    await safeAnswerCallback(ctx);
-    const keyboard = new InlineKeyboard();
-    for (const tc of SEEK_TIME_CONTROLS) {
-      keyboard.text(tc.label, `seek:${tc.minutes}:${tc.increment}`).row();
-    }
-    await ctx.editMessageText("Pick a time control (rated pairing):", { reply_markup: keyboard });
-  });
-
-  bot.callbackQuery(/^seek:([\d.]+):(\d+)$/, async (ctx) => {
-    await safeAnswerCallback(ctx);
-    if (gameManager.hasActiveGame()) {
-      await ctx.editMessageText(`You already have an active game: ${gameManager.getActiveGameLink()}`);
-      return;
-    }
-    const minutes = Number(ctx.match[1]);
-    const increment = Number(ctx.match[2]);
-    seekGame({ minutes, increment, rated: true }).catch((err) => {
-      if (activeChatId !== undefined) {
-        bot.api.sendMessage(activeChatId, `Seek failed: ${(err as Error).message}`).catch(() => {});
-      }
-    });
-    await ctx.editMessageText(
-      `Looking for an opponent (${minutes}+${increment})... I'll message you when the game starts.`,
-    );
-  });
-
-  bot.callbackQuery("newgame:friend", async (ctx) => {
-    await safeAnswerCallback(ctx);
-    if (gameManager.hasActiveGame()) {
-      await ctx.editMessageText(`You already have an active game: ${gameManager.getActiveGameLink()}`);
-      return;
-    }
-    awaitingChallengeUsername = true;
-    await ctx.editMessageText(
-      `Send the lichess username of the friend you want to challenge ` +
-        `(${FRIEND_TIME_CONTROL.minutes}+${FRIEND_TIME_CONTROL.increment}, casual).`,
-    );
+    await ctx.reply("How would you like to start a game?", { reply_markup: newGameMenu });
   });
 
   bot.command("status", async (ctx) => {
