@@ -12,7 +12,7 @@ let awaitingChallengeUsername = false;
 // (estimated duration = minutes*60 + increment*40 >= 480s); Bullet/Blitz are rejected outright.
 const SEEK_TIME_CONTROLS: Array<TimeControl & { label: string }> = [
   { label: "10+5 Rapid", minutes: 10, increment: 5 },
-  { label: "15+10 Classical", minutes: 15, increment: 10 },
+  { label: "15+10 Rapid", minutes: 15, increment: 10 },
   { label: "30+0 Classical", minutes: 30, increment: 0 },
   { label: "30+20 Classical", minutes: 30, increment: 20 },
 ];
@@ -75,7 +75,8 @@ export function createBot(): { bot: Bot; gameManager: GameManager } {
           }
         });
         await ctx.editMessageText(
-          `🔎 Looking for an opponent (${tc.minutes}+${tc.increment})... I'll message you when the game starts.`,
+          `🔎 Looking for an opponent (${tc.minutes}+${tc.increment})...\n` +
+            `This can take anywhere from seconds to a few minutes. I'll message you here the moment it matches.`,
         );
       })
       .row();
