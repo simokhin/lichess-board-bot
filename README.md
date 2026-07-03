@@ -30,23 +30,38 @@ opponent's moves come back as Telegram messages.
 
 ## Setup
 
+You'll need Node.js 18+ installed. Then, in a terminal, inside this folder:
+
 1. Install dependencies:
    ```
    npm install
    ```
-2. Copy `.env.example` to `.env` and fill in:
-   - `TELEGRAM_BOT_TOKEN` — create a bot via [@BotFather](https://t.me/BotFather).
-   - `LICHESS_TOKEN` — create a personal access token at
-     [lichess.org/account/oauth/token](https://lichess.org/account/oauth/token) with the
-     **`board:play`** scope.
-   - `TELEGRAM_ALLOWED_CHAT_ID` *(optional)* — restrict the bot to a single chat. Leave blank
-     initially; send `/start` to the bot and it will reply with your chat id.
-   - `DEBUG_LICHESS` *(optional)* — set to `1` to log every Lichess API request, response, and
-     stream message to the console.
+2. Run the guided setup — it walks you through getting both tokens and writes `.env` for you,
+   checking each token as you enter it:
+   ```
+   npm run setup
+   ```
+   (Prefer to do it by hand? Copy `.env.example` to `.env` and fill in the values described below.)
 3. Run it:
    ```
    npm run dev
    ```
+4. In Telegram, open a chat with your new bot and send `/start`.
+
+<details>
+<summary>What each .env value is, if you're filling it in manually</summary>
+
+- `TELEGRAM_BOT_TOKEN` — create a bot via [@BotFather](https://t.me/BotFather): send it `/newbot`
+  and follow the prompts. It replies with a token.
+- `LICHESS_TOKEN` — create a personal access token at
+  [lichess.org/account/oauth/token](https://lichess.org/account/oauth/token) with the
+  **`board:play`** scope checked.
+- `TELEGRAM_ALLOWED_CHAT_ID` *(optional)* — restrict the bot to a single chat. Leave blank
+  initially; send `/start` to the bot and it will reply with your chat id.
+- `DEBUG_LICHESS` *(optional)* — set to `1` to log every Lichess API request, response, and
+  stream message to the console.
+
+</details>
 
 ## Usage
 
@@ -77,3 +92,7 @@ offers, and game-end results arrive as bot messages.
 ## Requirements
 
 - Node.js >= 18
+
+## License
+
+[MIT](LICENSE)
